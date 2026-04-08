@@ -1,5 +1,5 @@
 # DocuMind
-<<<<<<< HEAD
+
  
 An AI-powered business document assistant built with RAG (Retrieval-Augmented Generation). Upload your PDFs and chat with them using natural language — all running locally for free.
 
