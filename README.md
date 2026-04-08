@@ -39,14 +39,6 @@ GROQ_API_KEY=your_groq_key
 NOMIC_API_KEY=your_nomic_key
 ```
 
-## Environment variables (frontend)
-
-Create `documind-ui/.env`:
-
-```env
-REACT_APP_API_URL=http://localhost:3000
-```
-
 ## Install
 
 From root:
