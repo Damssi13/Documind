@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Document } from './document.entity';
 import { OllamaService } from '../ollama/ollama.service';
-import PDFParser from 'pdf2json';
+const PDFParser = require('pdf2json');
 
 @Injectable()
 export class DocumentService {
@@ -13,21 +13,27 @@ export class DocumentService {
     private readonly ollama: OllamaService,
   ) {}
 
-  private parsePdf(buffer: Buffer): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const parser = new PDFParser();
-      parser.on('pdfParser_dataReady', (data) => {
-        const text = data.Pages.map((page) =>
-          page.Texts.map((t) => decodeURIComponent(t.R[0].T)).join(' ')
-        ).join('\n');
-        resolve(text);
-      });
-      parser.on('pdfParser_dataError', reject);
-      parser.parseBuffer(buffer);
+private parsePdf(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parser = new PDFParser();
+    parser.on('pdfParser_dataReady', (data) => {
+      const text = data.Pages.map((page) =>
+        page.Texts.map((t) => {
+          try {
+            return decodeURIComponent(t.R[0].T);
+          } catch {
+            return t.R[0].T;
+          }
+        }).join(' ')
+      ).join('\n');
+      resolve(text);
     });
-  }
+    parser.on('pdfParser_dataError', reject);
+    parser.parseBuffer(buffer);
+  });
+}
 
-  private chunkText(text: string, size = 500, overlap = 50): string[] {
+  private chunkText(text: string, size = 300, overlap = 100): string[] {
     const chunks: string[] = [];
     let start = 0;
     while (start < text.length) {
@@ -37,25 +43,27 @@ export class DocumentService {
     return chunks;
   }
 
-  async ingest(file: Express.Multer.File): Promise<{ chunks: number }> {
-    const text = await this.parsePdf(file.buffer);
-    const chunks = this.chunkText(text);
+async ingest(file: Express.Multer.File): Promise<{ chunks: number }> {
+  const text = await this.parsePdf(file.buffer);
+  const chunks = this.chunkText(text);
 
-    for (let i = 0; i < chunks.length; i++) {
-      const embedding = await this.ollama.embed(chunks[i]);
-      const doc = this.docRepo.create({
-        filename: file.originalname,
-        content: chunks[i],
-        chunkIndex: i,
-        embedding,
-      });
-      await this.docRepo.save(doc);
-    }
+  // embed all chunks in one API call
+  const embeddings = await this.ollama.embedBatch(chunks);
 
-    return { chunks: chunks.length };
+  for (let i = 0; i < chunks.length; i++) {
+    const doc = this.docRepo.create({
+      filename: file.originalname,
+      content: chunks[i],
+      chunkIndex: i,
+      embedding: embeddings[i],
+    });
+    await this.docRepo.save(doc);
   }
 
-  async similaritySearch(queryEmbedding: number[], topK = 5): Promise<Document[]> {
+  return { chunks: chunks.length };
+}
+
+  async similaritySearch(queryEmbedding: number[], topK = 10): Promise<Document[]> {
     const all = await this.docRepo.find();
     const scored = all.map((doc) => ({
       doc,

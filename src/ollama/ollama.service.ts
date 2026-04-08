@@ -1,33 +1,52 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import Groq from 'groq-sdk';
 import axios from 'axios';
 
 @Injectable()
 export class OllamaService {
-  private readonly baseUrl: string;
-  private readonly embedModel: string;
-  private readonly llmModel: string;
+  private readonly groq: Groq;
+  private readonly nomicApiKey: string;
 
   constructor(private config: ConfigService) {
-    this.baseUrl = this.config.get<string>('OLLAMA_URL')!;
-    this.embedModel = this.config.get<string>('OLLAMA_EMBED_MODEL')!;
-    this.llmModel = this.config.get<string>('OLLAMA_LLM_MODEL')!;
+    this.groq = new Groq({
+      apiKey: this.config.get<string>('GROQ_API_KEY')!,
+    });
+    this.nomicApiKey = this.config.get<string>('NOMIC_API_KEY')!;
   }
 
   async embed(text: string): Promise<number[]> {
-    const res = await axios.post(`${this.baseUrl}/api/embeddings`, {
-      model: this.embedModel,
-      prompt: text,
-    });
-    return res.data.embedding;
+    return (await this.embedBatch([text]))[0];
+  }
+
+  async embedBatch(texts: string[], taskType = 'search_document'): Promise<number[][]> {
+    const res = await axios.post(
+      'https://api-atlas.nomic.ai/v1/embedding/text',
+      {
+        model: 'nomic-embed-text-v1.5',
+        texts,
+        task_type: taskType,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.nomicApiKey}`,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+    return res.data.embeddings;
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    return (await this.embedBatch([text], 'search_query'))[0];
   }
 
   async generate(prompt: string): Promise<string> {
-    const res = await axios.post(`${this.baseUrl}/api/generate`, {
-      model: this.llmModel,
-      prompt,
-      stream: false,
+    const response = await this.groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1024,
     });
-    return res.data.response;
+    return response.choices[0].message.content ?? '';
   }
 }
