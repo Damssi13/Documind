@@ -68,12 +68,8 @@ Frontend:
 
 ```bash
 cd documind-ui
-npm start
+PORT=3001 npm start
 ```
-
-Default URLs:
-- API: http://localhost:3000
-- UI: http://localhost:3001 (CRA default can vary)
 
 ## API overview
 
