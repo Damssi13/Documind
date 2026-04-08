@@ -108,22 +108,4 @@ Response:
 }
 ```
 
-## Scripts
-
-Backend (root):
-- `npm run start:dev` - start API in watch mode
-- `npm run build` - compile backend
-- `npm run test` - run unit tests
-- `npm run test:e2e` - run e2e tests
-
-Frontend ([documind-ui](documind-ui)):
-- `npm start` - run React app
-- `npm run build` - production build
-- `npm test` - frontend tests
-
-## Notes
-
-- Current retrieval is in-memory cosine scoring after loading stored chunks.
-- TypeORM is configured with `synchronize: true` for local development.
-  Do not use that in production without migrations.
 
